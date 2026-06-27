@@ -367,6 +367,37 @@ table.tbl tbody tr:hover { background: var(--panel-2); }
   .scrim { position: fixed; inset: 0; background: rgba(0,0,0,.3); z-index: 80; }
 }
 
+/* ─── Order timeline stepper ─────────────────────────────────────────────────── */
+.timeline { display: flex; align-items: flex-start; width: 100%; min-width: 560px; }
+.timeline.mini { min-width: 0; }
+.tl-step { flex: 1; display: flex; flex-direction: column; align-items: center; position: relative; }
+.tl-line { position: absolute; top: 14px; right: 50%; width: 100%; height: 2px; background: var(--line); }
+.timeline.mini .tl-line { top: 6px; }
+.tl-line.on { background: var(--brand); }
+.tl-dot {
+  width: 30px; height: 30px; border-radius: 50%; z-index: 1;
+  display: flex; align-items: center; justify-content: center; font-size: 13px;
+  background: var(--panel-2); border: 1px solid var(--line); color: var(--muted-2);
+}
+.timeline.mini .tl-dot { width: 12px; height: 12px; }
+.tl-dot.done { background: var(--brand); border-color: var(--brand); color: #fff; }
+.tl-dot.current { background: var(--brand-soft); border: 2px solid var(--brand); color: var(--brand); }
+.tl-dot.paused { background: rgba(169, 128, 47, .14); border-color: var(--amber); color: var(--amber); }
+.tl-label { font-size: 11px; margin-top: 6px; color: var(--muted); text-align: center; line-height: 1.2; }
+.timeline.tl-cancel { opacity: .45; }
+
+/* ─── Order slide panel ──────────────────────────────────────────────────────── */
+.panel-scrim { position: fixed; inset: 0; z-index: 70; background: transparent; pointer-events: none; }
+.slide-panel {
+  position: fixed; top: 0; right: 0; height: 100vh; width: 340px; max-width: 92vw;
+  background: var(--panel); border-left: 1px solid var(--line); box-shadow: var(--shadow);
+  z-index: 80; padding: 18px; overflow-y: auto;
+}
+@media (max-width: 640px) {
+  .panel-scrim { background: rgba(0, 0, 0, .35); pointer-events: auto; }
+  .slide-panel { width: 100%; max-width: 100%; }
+}
+
 /* ─── Reduced motion (Section 15.10) ─────────────────────────────────────────── */
 @media (prefers-reduced-motion: reduce) {
   .shimmer, .anim-fade-in, .anim-scale-in, .anim-slide-right, .press { animation: none !important; transition: none !important; }

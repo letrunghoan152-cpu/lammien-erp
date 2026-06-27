@@ -8,14 +8,13 @@ import { useAuth } from '@/components/AuthProvider'
 import { useToast } from '@/components/Toast'
 import Avatar from '@/components/Avatar'
 import { StatusPill, PaymentPill, DeliveryPill } from '@/components/StatusPill'
-import { ConfirmModal, Modal } from '@/components/Modal'
 import { PhotoGallery } from '@/components/Lightbox'
 import OrderHistory from '@/components/OrderHistory'
+import { OrderTimeline } from '@/components/orders/OrderTimeline'
+import OrderActions, { TransitionResp } from '@/components/orders/OrderActions'
 import { OrderDetailSkeleton } from '@/components/Skeletons'
 import { money, fmtDay, dash } from '@/lib/format'
-import { CANCEL_REASONS } from '@/lib/status'
-import { invalidateCache } from '@/lib/cache'
-import { OrderGetResponse, AllowedTransition } from '@/lib/types'
+import { OrderGetResponse } from '@/lib/types'
 
 export default function OrderDetailPage() {
   const { id } = useParams<{ id: string }>()
@@ -26,13 +25,6 @@ export default function OrderDetailPage() {
   const [data, setData] = useState<OrderGetResponse | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-
-  // modals
-  const [cancelOpen, setCancelOpen] = useState(false)
-  const [cancelReason, setCancelReason] = useState('customer')
-  const [chupOpen, setChupOpen] = useState(false)
-  const [collected, setCollected] = useState('')
-  const [busy, setBusy] = useState(false)
 
   // raw link
   const [rawInput, setRawInput] = useState('')
@@ -60,50 +52,16 @@ export default function OrderDetailPage() {
   const canFinancial = order.total_price !== undefined
   const canEditRaw = hasPerm('order.upload_raw_link') || isManager
 
-  // ── Thực hiện transition ──
-  type TransitionResp = {
-    status?: string; version?: number; warning?: string
-    allowed_transitions?: AllowedTransition[]
-    payment_status?: string; remaining_amount?: number; deposit_amount?: number
-  }
-  const doTransition = async (t: AllowedTransition, extra: Record<string, unknown> = {}) => {
-    setBusy(true)
-    const prevStatus = order.status
-    // optimistic: đổi pill ngay khi click
-    setData((d) => d ? { ...d, order: { ...d.order, status: t.hk ? d.order.status : t.to } } : d)
-    try {
-      const res = t.hk
-        ? await gasApi<TransitionResp>('orders.updateStatusHK', { order_id: id })
-        : await gasApi<TransitionResp>('orders.updateStatus', { order_id: id, status: t.to, version: order.version, ...extra })
-
-      if (res?.warning) toast('⚠️ ' + res.warning, 'error')
-      invalidateCache('orders'); invalidateCache('calendar')
-
-      // Cập nhật tại chỗ từ response — KHÔNG gọi lại orders.get → phản hồi nhanh
-      setData((d) => {
-        if (!d) return d
-        const o = { ...d.order, status: res.status ?? d.order.status, version: res.version ?? d.order.version }
-        if (res.payment_status !== undefined) o.payment_status = res.payment_status
-        if (res.remaining_amount !== undefined) o.remaining_amount = res.remaining_amount
-        if (res.deposit_amount !== undefined) o.deposit_amount = res.deposit_amount
-        return { ...d, order: o, allowed_transitions: res.allowed_transitions ?? d.allowed_transitions }
-      })
-      toast('Đã cập nhật trạng thái')
-    } catch (e) {
-      const ge = e as GasError
-      setData((d) => d ? { ...d, order: { ...d.order, status: prevStatus } } : d)
-      if (ge.appStatus === 409) { toast('Đơn vừa bị người khác sửa — đang tải lại…', 'error'); load() }
-      else if (ge.appStatus === 403) toast('Không có quyền thực hiện', 'error')
-      else toast(ge.message || 'Không thể cập nhật', 'error')
-    } finally {
-      setBusy(false); setCancelOpen(false); setChupOpen(false)
-    }
-  }
-
-  const onTransitionClick = (t: AllowedTransition) => {
-    if (t.to === 'HUY') { setCancelOpen(true); return }
-    if (t.to === 'DA_CHUP') { setChupOpen(true); return }
-    doTransition(t)
+  // ── Cập nhật state tại chỗ khi OrderActions chuyển trạng thái xong (không refetch) ──
+  const onTransitionUpdated = (res: TransitionResp) => {
+    setData((d) => {
+      if (!d) return d
+      const o = { ...d.order, status: res.status ?? d.order.status, version: res.version ?? d.order.version }
+      if (res.payment_status !== undefined) o.payment_status = res.payment_status
+      if (res.remaining_amount !== undefined) o.remaining_amount = res.remaining_amount
+      if (res.deposit_amount !== undefined) o.deposit_amount = res.deposit_amount
+      return { ...d, order: o, allowed_transitions: res.allowed_transitions ?? d.allowed_transitions }
+    })
   }
 
   const uploadRaw = async () => {
@@ -162,6 +120,11 @@ export default function OrderDetailPage() {
           </div>
         </div>
       )}
+
+      {/* Timeline tiến trình đơn */}
+      <div className="card" style={{ marginTop: 16, overflowX: 'auto' }}>
+        <OrderTimeline status={order.status} size="full" />
+      </div>
 
       <div className="detail-grid" style={{ marginTop: 16 }}>
         {/* ── Trái: concepts, addons, history ── */}
@@ -259,55 +222,24 @@ export default function OrderDetailPage() {
         </div>
       </div>
 
-      {/* Action bar transitions (Section 15.13) */}
+      {/* Action bar transitions (Section 15.13) — dùng component dùng chung */}
       {allowed_transitions.length > 0 && (
         <div className="action-bar">
           <span className="muted">Trạng thái:</span> <StatusPill status={order.status} />
           <span className="spacer" />
-          {allowed_transitions.map((t) => (
-            <button key={t.to} className={'btn press' + (t.kind === 'danger' ? ' danger' : t.kind === 'ghost' ? ' ghost' : '')}
-              onClick={() => onTransitionClick(t)} disabled={busy}>
-              {t.label}{!t.hk && t.to !== 'HUY' ? ' →' : ''}
-            </button>
-          ))}
+          <OrderActions
+            orderId={order.order_id}
+            version={order.version}
+            allowedTransitions={allowed_transitions}
+            canFinancial={canFinancial}
+            remaining={remaining}
+            rawLinkMissing={!order.raw_link}
+            onUpdated={onTransitionUpdated}
+            onReload={load}
+            layout="bar"
+          />
         </div>
       )}
-
-      {/* Modal HỦY */}
-      <Modal open={cancelOpen} title="Hủy đơn hàng" onClose={() => setCancelOpen(false)} small>
-        <p className="muted" style={{ marginTop: 0 }}>Hành động không thể hoàn tác. Chọn lý do hủy:</p>
-        <div className="field">
-          {CANCEL_REASONS.map((r) => (
-            <label key={r.value} className="row" style={{ gap: 8, marginBottom: 6, cursor: 'pointer' }}>
-              <input type="radio" name="cr" checked={cancelReason === r.value} onChange={() => setCancelReason(r.value)} />
-              <span>{r.label}</span>
-            </label>
-          ))}
-        </div>
-        <div className="modal-actions">
-          <button className="btn ghost" onClick={() => setCancelOpen(false)} disabled={busy}>Hủy bỏ</button>
-          <button className="btn danger" onClick={() => doTransition({ to: 'HUY' } as AllowedTransition, { cancel_reason: cancelReason })} disabled={busy}>
-            {busy ? 'Đang xử lý…' : 'Xác nhận hủy'}
-          </button>
-        </div>
-      </Modal>
-
-      {/* Modal ĐÃ CHỤP + thu tiền */}
-      <Modal open={chupOpen} title="Đã chụp + Thu tiền" onClose={() => setChupOpen(false)} small>
-        <p className="muted" style={{ marginTop: 0 }}>Xác nhận buổi chụp hoàn tất. Nhập số tiền thu thêm tại buổi chụp:</p>
-        <div className="field">
-          <label className="label">Số tiền thu thêm</label>
-          <input type="number" className="input" value={collected} onChange={(e) => setCollected(e.target.value)} placeholder={canFinancial ? String(remaining) : '0'} />
-          {canFinancial && <div className="dim" style={{ marginTop: 6 }}>Còn lại hiện tại: {money(remaining)}</div>}
-        </div>
-        {!order.raw_link && <div className="banner amber"><span>⚠️</span><span>Photographer chưa upload link ảnh raw — vẫn cho phép chuyển trạng thái.</span></div>}
-        <div className="modal-actions">
-          <button className="btn ghost" onClick={() => setChupOpen(false)} disabled={busy}>Hủy bỏ</button>
-          <button className="btn" onClick={() => doTransition({ to: 'DA_CHUP' } as AllowedTransition, { collected_amount: Number(collected) || 0 })} disabled={busy}>
-            {busy ? 'Đang xử lý…' : 'Xác nhận'}
-          </button>
-        </div>
-      </Modal>
     </div>
   )
 }

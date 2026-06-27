@@ -3,12 +3,11 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
 import { gasApi, GasError } from '@/lib/gasApi'
 import { useAuth } from '@/components/AuthProvider'
-import { useToast } from '@/components/Toast'
 import Avatar from '@/components/Avatar'
 import { StatusPill, PaymentPill } from '@/components/StatusPill'
+import OrderSlidePanel from '@/components/orders/OrderSlidePanel'
 import { OrderListSkeleton } from '@/components/Skeletons'
 import { money, fmtDay, dash } from '@/lib/format'
 import { STATUS_META } from '@/lib/status'
@@ -21,8 +20,6 @@ const PAGE = 50
 
 export default function OrdersPage() {
   const { hasPerm } = useAuth()
-  const router = useRouter()
-  const toast = useToast()
 
   const [orders, setOrders] = useState<OrderListItem[]>([])
   const [offset, setOffset] = useState(0)
@@ -37,6 +34,7 @@ export default function OrdersPage() {
   const [q, setQ] = useState('')
   const qDebounce = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [qApplied, setQApplied] = useState('')
+  const [selectedId, setSelectedId] = useState<string | null>(null)
 
   const canFinancial = hasPerm('order.view_financial')
   const canCreate = hasPerm('order.create_edit')
@@ -136,7 +134,11 @@ export default function OrdersPage() {
               </thead>
               <tbody>
                 {orders.map((o) => (
-                  <tr key={o.order_id} onClick={() => router.push('/orders/' + o.order_id)}>
+                  <tr
+                    key={o.order_id}
+                    onClick={() => setSelectedId(o.order_id)}
+                    style={o.order_id === selectedId ? { background: 'var(--brand-soft)', boxShadow: 'inset 2px 0 0 var(--brand)' } : undefined}
+                  >
                     <td>
                       <div className="row" style={{ gap: 10, flexWrap: 'nowrap' }}>
                         <Avatar name={o.customer_name} url={o.customer_avatar_url} size="md" />
@@ -166,6 +168,15 @@ export default function OrdersPage() {
           )}
         </div>
       )}
+
+      <OrderSlidePanel
+        orderId={selectedId}
+        onClose={() => setSelectedId(null)}
+        onChanged={(id, newStatus) => {
+          setOrders((prev) => prev.map((o) => (o.order_id === id ? { ...o, status: newStatus } : o)))
+          cache.delPrefix('orders:list:') // danh sách cache đã cũ
+        }}
+      />
     </div>
   )
 }
