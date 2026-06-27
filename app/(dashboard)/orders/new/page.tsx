@@ -7,8 +7,9 @@ import { gasApi, GasError } from '@/lib/gasApi'
 import { useAuth } from '@/components/AuthProvider'
 import { useToast } from '@/components/Toast'
 import Avatar from '@/components/Avatar'
-import { invalidateCache, cache } from '@/lib/cache'
-import { TTL, DEFAULT_SLOT_TIMES } from '@/lib/config'
+import { invalidateCache } from '@/lib/cache'
+import { DEFAULT_SLOT_TIMES } from '@/lib/config'
+import { useBootstrap } from '@/lib/useBootstrap'
 import { money, fmtDay } from '@/lib/format'
 import { SALE_CHANNELS, CUSTOMER_SOURCES } from '@/lib/status'
 import { computeTotal, addMinutes, minutesOf } from '@/lib/booking'
@@ -75,25 +76,17 @@ export default function NewOrderPage() {
   const [submitting, setSubmitting] = useState(false)
   const [errors, setErrors] = useState<string[]>([])
 
-  // ── Load static data ──
+  // ── Load static data — 1 call bootstrap (đã cache cả phiên) thay vì 5 call ──
+  const { data: boot } = useBootstrap()
   useEffect(() => {
-    const loaders: Array<[string, (d: any) => void]> = [
-      ['services.list', (d) => setServices(d.services)],
-      ['vouchers.list', (d) => setVouchers(d.vouchers)],
-      ['locations.list', (d) => setLocations(d.locations)],
-      ['addons.list', (d) => setAddonCatalog(d.addons)],
-    ]
-    loaders.forEach(([action, set]) => {
-      const ck = 'services:' + action
-      const c = cache.get<any>(ck)
-      if (c) set(c)
-      gasApi(action, action === 'vouchers.list' ? { only_valid: true } : {})
-        .then((d) => { set(d); cache.set(ck, d, TTL.STATIC) })
-        .catch(() => {})
-    })
-    gasApi<Record<string, string>>('settings.get')
-      .then((s) => { if (s.slot_times) setSlots(String(s.slot_times).split(',').map((x) => x.trim())) })
-      .catch(() => {})
+    if (!boot) return
+    setServices(boot.services)
+    setVouchers(boot.vouchers)
+    setLocations(boot.locations)
+    setAddonCatalog(boot.addons)
+    if (boot.slot_times?.length) setSlots(boot.slot_times)
+  }, [boot])
+  useEffect(() => {
     if (user?.default_location_id) setLocationId(user.default_location_id)
   }, [user])
 

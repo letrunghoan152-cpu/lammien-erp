@@ -15,6 +15,7 @@ import { STATUS_META } from '@/lib/status'
 import { OrderListItem, Location } from '@/lib/types'
 import { cache } from '@/lib/cache'
 import { TTL } from '@/lib/config'
+import { useBootstrap } from '@/lib/useBootstrap'
 
 const PAGE = 50
 
@@ -40,17 +41,19 @@ export default function OrdersPage() {
   const canFinancial = hasPerm('order.view_financial')
   const canCreate = hasPerm('order.create_edit')
 
-  useEffect(() => {
-    const cached = cache.get<{ locations: Location[] }>('services:locations.list')
-    if (cached) setLocations(cached.locations)
-    gasApi<{ locations: Location[] }>('locations.list')
-      .then((d) => { setLocations(d.locations); cache.set('services:locations.list', d, TTL.STATIC) })
-      .catch(() => {})
-  }, [])
+  // Cơ sở lấy từ bootstrap (đã cache cả phiên) — bỏ 1 call locations.list
+  const { data: boot } = useBootstrap()
+  useEffect(() => { if (boot?.locations) setLocations(boot.locations) }, [boot])
 
   const fetchPage = useCallback((reset: boolean) => {
     const off = reset ? 0 : offset
-    if (reset) setLoading(true); else setLoadingMore(true)
+    const cacheKey = `orders:list:${status}|${locationId}|${qApplied}`
+    if (reset) {
+      // stale-while-revalidate: hiện cache cũ ngay (điều hướng tức thì), fetch nền
+      const cached = cache.get<OrderListItem[]>(cacheKey)
+      if (cached) { setOrders(cached); setOffset(PAGE); setHasMore(cached.length === PAGE); setLoading(false) }
+      else setLoading(true)
+    } else setLoadingMore(true)
     gasApi<{ orders: OrderListItem[]; hasMore: boolean }>('orders.list', {
       status, location_id: locationId, q: qApplied, limit: PAGE, offset: off,
     })
@@ -59,6 +62,7 @@ export default function OrdersPage() {
         setOffset(off + PAGE)
         setHasMore(d.hasMore)
         setError(null)
+        if (reset) cache.set(cacheKey, d.orders, TTL.DYNAMIC)
       })
       .catch((e: GasError) => setError(e.message))
       .finally(() => { setLoading(false); setLoadingMore(false) })

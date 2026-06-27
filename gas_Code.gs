@@ -36,6 +36,19 @@ function doGet(e) {
         .setMimeType(ContentService.MimeType.JSON)
     }
   }
+  // ── One-time: bật keep-alive trigger (chống cold start) qua GET ?keepalive=<KEY> ──
+  if (e && e.parameter && e.parameter.keepalive === INIT_KEY) {
+    try {
+      setupKeepAlive()
+      return ContentService
+        .createTextOutput(JSON.stringify({ ok: true, keepalive: 'enabled (mỗi 4 phút)', ts: nowVN() }))
+        .setMimeType(ContentService.MimeType.JSON)
+    } catch (err) {
+      return ContentService
+        .createTextOutput(JSON.stringify({ ok: false, error: String(err && err.message || err) }))
+        .setMimeType(ContentService.MimeType.JSON)
+    }
+  }
   // Dùng để warm GAS (keepAlive ping từ frontend khi mount login page)
   return ContentService
     .createTextOutput(JSON.stringify({ ok: true, service: 'LamMien Studio API', ts: nowVN() }))
@@ -118,6 +131,7 @@ function route(action, params, user, permissions) {
       case 'vouchers.upsert': return actionVouchersUpsert(params, user, permissions)
       case 'vouchers.apply':  return actionVouchersApply(params, user, permissions)
       case 'locations.list':  return actionLocationsList(params, user, permissions)
+      case 'bootstrap':       return actionBootstrap(params, user, permissions)
 
       // Hậu Kỳ & Album
       case 'hauky.list':        return actionHaukyList(params, user, permissions)
@@ -348,11 +362,12 @@ function setupKeepAlive() {
       ScriptApp.deleteTrigger(t)
     }
   })
+  // GAS chỉ cho everyMinutes(1|5|10|15|30). Dùng 1 phút để LUÔN warm (ưu tiên ổn định).
   ScriptApp.newTrigger('keepAlive')
     .timeBased()
-    .everyMinutes(4)
+    .everyMinutes(1)
     .create()
-  Logger.log('keepAlive trigger đã được tạo — chạy mỗi 4 phút')
+  Logger.log('keepAlive trigger đã được tạo — chạy mỗi 1 phút')
 }
 
 function keepAlive() {
