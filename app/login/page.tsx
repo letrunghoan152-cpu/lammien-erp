@@ -1,34 +1,31 @@
 'use client'
-// app/login/page.tsx — đăng nhập Google (GIS) + warm GAS chống cold start
+// app/login/page.tsx — đăng nhập Google (GIS redirect mode) + warm GAS chống cold start
 
 import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { renderSignInButton } from '@/lib/auth'
-import { gasApi, gasPing } from '@/lib/gasApi'
+import { renderSignInButton, getStoredToken } from '@/lib/auth'
+import { gasPing } from '@/lib/gasApi'
 import { IS_CONFIGURED, GAS_URL, GOOGLE_CLIENT_ID } from '@/lib/config'
-import { cache } from '@/lib/cache'
 
 export default function LoginPage() {
   const router = useRouter()
   const btnRef = useRef<HTMLDivElement>(null)
-  const [status, setStatus] = useState<'idle' | 'verifying' | 'error'>('idle')
-  const [errMsg, setErrMsg] = useState('')
+  const [authError, setAuthError] = useState('')
 
   useEffect(() => {
+    // Đã có phiên hợp lệ → vào thẳng dashboard
+    if (getStoredToken()) { router.replace('/orders'); return }
+
+    // Hiển thị lỗi nếu redirect callback trả về ?auth_error=
+    const params = new URLSearchParams(window.location.search)
+    const err = params.get('auth_error')
+    if (err) setAuthError(err)
+
     gasPing() // warm GAS ngay khi mở trang (PRD Section 20.2)
     if (!IS_CONFIGURED || !btnRef.current) return
-    renderSignInButton(btnRef.current, async () => {
-      setStatus('verifying')
-      try {
-        const data = await gasApi<{ user: unknown; permissions: string[] }>('auth.verify')
-        cache.set('auth.verify', data, 30 * 60 * 1000)
-        router.replace('/orders')
-      } catch (e) {
-        const err = e as { message?: string }
-        setStatus('error')
-        setErrMsg(err.message || 'Đăng nhập thất bại')
-      }
-    }).catch((e) => { setStatus('error'); setErrMsg(e.message) })
+    renderSignInButton(btnRef.current).catch(() => {
+      setAuthError('Không tải được đăng nhập Google — thử lại')
+    })
   }, [router])
 
   return (
@@ -49,8 +46,7 @@ export default function LoginPage() {
         ) : (
           <>
             <div ref={btnRef} style={{ display: 'flex', justifyContent: 'center', marginTop: 8 }} />
-            {status === 'verifying' && <div className="dim" style={{ marginTop: 12 }}>Đang xác thực…</div>}
-            {status === 'error' && <div className="note-box danger" style={{ marginTop: 12, textAlign: 'left' }}>{errMsg}</div>}
+            {authError && <div className="note-box danger" style={{ marginTop: 12, textAlign: 'left' }}>{authError}</div>}
             <p className="dim" style={{ marginTop: 16, fontSize: 12.5 }}>
               Đăng nhập bằng tài khoản Google đã được Manager cấp quyền.
             </p>

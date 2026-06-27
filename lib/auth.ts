@@ -32,6 +32,8 @@ export function loadGis(): Promise<void> {
   return scriptPromise
 }
 
+let _gisInit = false
+
 /** Decode payload JWT (không verify — chỉ đọc exp/email phía client) */
 export function decodeJwt(token: string): Record<string, any> | null {
   try {
@@ -78,26 +80,26 @@ export function getEmailFromToken(): string | null {
 }
 
 /**
- * Khởi tạo GIS + render nút "Đăng nhập với Google" vào element.
- * callback nhận id_token khi user đăng nhập thành công.
+ * Khởi tạo GIS + render nút "Đăng nhập với Google" vào element — DÙNG ux_mode 'redirect'.
+ *
+ * Vì sao redirect thay vì popup:
+ *   - Popup trả credential qua window.postMessage → bị COOP của accounts.google.com chặn.
+ *   - One Tap dùng FedCM → nhiều trình duyệt tắt FedCM → lỗi.
+ *   Redirect chuyển hẳn sang Google rồi POST credential về /api/auth/callback → chạy mọi nơi.
  */
-export async function renderSignInButton(
-  el: HTMLElement,
-  onCredential: (idToken: string) => void
-): Promise<void> {
+export async function renderSignInButton(el: HTMLElement): Promise<void> {
   await loadGis()
   if (!window.google) throw new Error('GIS chưa sẵn sàng')
-  window.google.accounts.id.initialize({
-    client_id: GOOGLE_CLIENT_ID,
-    callback: (resp: { credential: string }) => {
-      setToken(resp.credential)
-      onCredential(resp.credential)
-    },
-    auto_select: false,
-    // KHÔNG ép FedCM: nhiều trình duyệt đã tắt FedCM → ép sẽ làm hỏng đăng nhập
-    // (lỗi "FedCM get() rejects"). Nút đăng nhập dùng luồng popup; popup trả credential
-    // về trang qua window.postMessage → cần header COOP=same-origin-allow-popups (next.config).
-  })
+  const loginUri = window.location.origin + '/api/auth/callback'
+  if (!_gisInit) {
+    window.google.accounts.id.initialize({
+      client_id: GOOGLE_CLIENT_ID,
+      ux_mode: 'redirect',     // KHÔNG popup → không dính COOP/FedCM
+      login_uri: loginUri,     // Google POST credential tới đây
+      auto_select: false,
+    })
+    _gisInit = true
+  }
   window.google.accounts.id.renderButton(el, {
     theme: 'outline',
     size: 'large',
@@ -106,8 +108,6 @@ export async function renderSignInButton(
     shape: 'rectangular',
     locale: 'vi',
   })
-  // KHÔNG gọi prompt() (One Tap): nó kích hoạt FedCM (đang bị tắt ở trình duyệt) gây lỗi.
-  // Đăng nhập bằng nút bấm (popup) là đủ và ổn định.
 }
 
 export function signOut() {
