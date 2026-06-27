@@ -778,7 +778,19 @@ function actionOrdersUpdateStatus(p, u, perms) {
     logHistory(orderId, u.user_id, 'STATUS_CHANGE', 'status', curStatus, newStatus)
 
     invalidateOrderCaches()
-    var resp = { order_id: orderId, version: newVersion, status: newStatus }
+    // Trả đủ dữ liệu để client cập nhật tại chỗ — KHÔNG cần gọi lại orders.get (nhanh hơn)
+    var resp = {
+      order_id: orderId,
+      version: newVersion,
+      status: newStatus,
+      allowed_transitions: getAllowedTransitions(newStatus, perms, u.role_id),
+    }
+    if (perms.has('order.view_financial')) {
+      var newRow = sheet.getRange(rowIdx, 1, 1, COL.ORDER.updated_at + 1).getValues()[0]
+      resp.payment_status = newRow[COL.ORDER.payment_status] || 'CHUA_COC'
+      resp.remaining_amount = Number(newRow[COL.ORDER.remaining_amount]) || 0
+      resp.deposit_amount = Number(newRow[COL.ORDER.deposit_amount]) || 0
+    }
     if (warning) resp.warning = warning
     return jsonOk(resp)
   })
@@ -810,7 +822,10 @@ function actionOrdersUpdateStatusHK(p, u, perms) {
     found.sheet.getRange(found.rowIndex, COL.ORDER.updated_at + 1).setValue(nowVN())
     logHistory(orderId, u.user_id, 'STATUS_CHANGE', 'status', curStatus, target)
     invalidateOrderCaches()
-    return jsonOk({ order_id: orderId, version: newVersion, status: target })
+    return jsonOk({
+      order_id: orderId, version: newVersion, status: target,
+      allowed_transitions: getAllowedTransitions(target, perms, u.role_id),
+    })
   })
 }
 

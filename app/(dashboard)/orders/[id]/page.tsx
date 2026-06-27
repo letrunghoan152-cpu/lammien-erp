@@ -61,22 +61,34 @@ export default function OrderDetailPage() {
   const canEditRaw = hasPerm('order.upload_raw_link') || isManager
 
   // ── Thực hiện transition ──
+  type TransitionResp = {
+    status?: string; version?: number; warning?: string
+    allowed_transitions?: AllowedTransition[]
+    payment_status?: string; remaining_amount?: number; deposit_amount?: number
+  }
   const doTransition = async (t: AllowedTransition, extra: Record<string, unknown> = {}) => {
     setBusy(true)
     const prevStatus = order.status
+    // optimistic: đổi pill ngay khi click
     setData((d) => d ? { ...d, order: { ...d.order, status: t.hk ? d.order.status : t.to } } : d)
     try {
-      if (t.hk) {
-        await gasApi('orders.updateStatusHK', { order_id: id })
-      } else {
-        const res = await gasApi<{ warning?: string }>('orders.updateStatus', {
-          order_id: id, status: t.to, version: order.version, ...extra,
-        })
-        if (res?.warning) toast('⚠️ ' + res.warning, 'error')
-      }
+      const res = t.hk
+        ? await gasApi<TransitionResp>('orders.updateStatusHK', { order_id: id })
+        : await gasApi<TransitionResp>('orders.updateStatus', { order_id: id, status: t.to, version: order.version, ...extra })
+
+      if (res?.warning) toast('⚠️ ' + res.warning, 'error')
       invalidateCache('orders'); invalidateCache('calendar')
+
+      // Cập nhật tại chỗ từ response — KHÔNG gọi lại orders.get → phản hồi nhanh
+      setData((d) => {
+        if (!d) return d
+        const o = { ...d.order, status: res.status ?? d.order.status, version: res.version ?? d.order.version }
+        if (res.payment_status !== undefined) o.payment_status = res.payment_status
+        if (res.remaining_amount !== undefined) o.remaining_amount = res.remaining_amount
+        if (res.deposit_amount !== undefined) o.deposit_amount = res.deposit_amount
+        return { ...d, order: o, allowed_transitions: res.allowed_transitions ?? d.allowed_transitions }
+      })
       toast('Đã cập nhật trạng thái')
-      load()
     } catch (e) {
       const ge = e as GasError
       setData((d) => d ? { ...d, order: { ...d.order, status: prevStatus } } : d)
