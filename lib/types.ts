@@ -193,6 +193,31 @@ export interface Notif {
   created_at: string
 }
 
+// ── Phase 3: Admin (nhân sự / vai trò / phân quyền) ──
+export interface AdminUser {
+  user_id: string
+  name: string
+  email: string
+  role_id: string
+  role_name: string
+  location_ids: string[]
+  location_names: string[]
+  default_location_id: string | null
+  is_active: boolean
+  base_salary: number
+  concept_rate_type: string
+  concept_rate_value: number
+  hau_ky_rate_per_file: number
+}
+export interface RoleItem { role_id: string; role_name: string; is_system?: boolean }
+export interface PermissionItem { key: string; label: string; group: string }
+export interface RolesListResponse {
+  roles: RoleItem[]
+  permissions: PermissionItem[]
+  matrix: Record<string, Record<string, boolean>>
+}
+export interface UsersListResponse { users: AdminUser[]; roles: RoleItem[]; locations: Location[] }
+
 export interface OrderHistoryItem {
   history_id: string
   changed_by: string

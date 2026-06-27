@@ -130,8 +130,9 @@ function route(action, params, user, permissions) {
       case 'vouchers.list':   return actionVouchersList(params, user, permissions)
       case 'vouchers.upsert': return actionVouchersUpsert(params, user, permissions)
       case 'vouchers.apply':  return actionVouchersApply(params, user, permissions)
-      case 'locations.list':  return actionLocationsList(params, user, permissions)
-      case 'bootstrap':       return actionBootstrap(params, user, permissions)
+      case 'locations.list':   return actionLocationsList(params, user, permissions)
+      case 'locations.upsert': return actionLocationsUpsert(params, user, permissions)
+      case 'bootstrap':        return actionBootstrap(params, user, permissions)
 
       // Hậu Kỳ & Album
       case 'hauky.list':        return actionHaukyList(params, user, permissions)
@@ -453,26 +454,9 @@ function actionBonusPenaltyUpsert(p, u, perms) {
   requirePermission(perms, 'bonus_penalty.manage')
   return jsonOk({ _note: 'Phase 5 — chưa implement' })
 }
-function actionUsersList(p, u, perms) {
-  requirePermission(perms, 'salary.manage_config')
-  return jsonOk({ users: [], _note: 'Phase 3 — chưa implement' })
-}
-function actionUsersUpsert(p, u, perms) {
-  requirePermission(perms, 'salary.manage_config')
-  return jsonOk({ _note: 'Phase 3 — chưa implement' })
-}
-function actionRolesList(p, u, perms) {
-  requirePermission(perms, 'role.manage')
-  return jsonOk({ roles: [], _note: 'Phase 3 — chưa implement' })
-}
-function actionRolesUpsert(p, u, perms) {
-  requirePermission(perms, 'role.create')
-  return jsonOk({ _note: 'Phase 3 — chưa implement' })
-}
-function actionPermissionsUpdate(p, u, perms) {
-  requirePermission(perms, 'role.manage')
-  return jsonOk({ _note: 'Phase 3 — chưa implement' })
-}
+// actionUsersList / actionUsersUpsert / actionRolesList / actionRolesUpsert
+// / actionPermissionsUpdate → implement đầy đủ trong gas_admin.gs (Phase 3)
+
 function actionNotificationsList(p, u, perms) {
   // Không cần permission riêng — mọi user đều nhận notification của mình
   const rows = getAllRows('NOTIFICATIONS')
