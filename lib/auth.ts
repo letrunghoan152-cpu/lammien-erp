@@ -94,7 +94,9 @@ export async function renderSignInButton(
       onCredential(resp.credential)
     },
     auto_select: false,
-    use_fedcm_for_prompt: true,
+    // KHÔNG ép FedCM: nhiều trình duyệt đã tắt FedCM → ép sẽ làm hỏng đăng nhập
+    // (lỗi "FedCM get() rejects"). Nút đăng nhập dùng luồng popup; popup trả credential
+    // về trang qua window.postMessage → cần header COOP=same-origin-allow-popups (next.config).
   })
   window.google.accounts.id.renderButton(el, {
     theme: 'outline',
@@ -104,8 +106,8 @@ export async function renderSignInButton(
     shape: 'rectangular',
     locale: 'vi',
   })
-  // One Tap (không bắt buộc) — bỏ qua lỗi nếu bị chặn
-  try { window.google.accounts.id.prompt() } catch { /* noop */ }
+  // KHÔNG gọi prompt() (One Tap): nó kích hoạt FedCM (đang bị tắt ở trình duyệt) gây lỗi.
+  // Đăng nhập bằng nút bấm (popup) là đủ và ổn định.
 }
 
 export function signOut() {

@@ -45,7 +45,10 @@ function setupAll() {
   seedLocations(ss)
 
   Logger.log('=== SETUP HOÀN TẤT ===')
-  SpreadsheetApp.getUi().alert('✅ Setup hoàn tất!\n\nĐã tạo đủ 19 tab.\nKiểm tra các tab ROLES, ROLE_PERMISSIONS, SETTINGS, LOCATIONS để xác nhận seed data.')
+  // getUi() chỉ khả dụng khi chạy trong editor; bỏ qua an toàn khi chạy headless (web app/API)
+  try {
+    SpreadsheetApp.getUi().alert('✅ Setup hoàn tất!\n\nĐã tạo đủ 19 tab.\nKiểm tra các tab ROLES, ROLE_PERMISSIONS, SETTINGS, LOCATIONS để xác nhận seed data.')
+  } catch (e) { Logger.log('(headless) ' + e.message) }
 }
 
 // ─── Helper tạo sheet ─────────────────────────────────────────────────────────

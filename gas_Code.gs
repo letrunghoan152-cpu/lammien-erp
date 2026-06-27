@@ -19,7 +19,23 @@
 
 // ─── Entry Points ─────────────────────────────────────────────────────────────
 
+var INIT_KEY = 'lammien_init_8472'  // one-time setup key (xoá sau khi init xong nếu muốn)
+
 function doGet(e) {
+  // ── One-time headless setup: GET ?init=<INIT_KEY> → chạy setupAll + seedDevData ──
+  if (e && e.parameter && e.parameter.init === INIT_KEY) {
+    try {
+      setupAll()
+      seedDevData()
+      return ContentService
+        .createTextOutput(JSON.stringify({ ok: true, init: 'done', ts: nowVN() }))
+        .setMimeType(ContentService.MimeType.JSON)
+    } catch (err) {
+      return ContentService
+        .createTextOutput(JSON.stringify({ ok: false, error: String(err && err.message || err) }))
+        .setMimeType(ContentService.MimeType.JSON)
+    }
+  }
   // Dùng để warm GAS (keepAlive ping từ frontend khi mount login page)
   return ContentService
     .createTextOutput(JSON.stringify({ ok: true, service: 'LamMien Studio API', ts: nowVN() }))

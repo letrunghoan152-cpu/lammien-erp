@@ -71,6 +71,8 @@ function seedDevData() {
     Logger.log('Seed VOUCHER: ' + vouchers.length)
   }
 
-  SpreadsheetApp.getUi().alert('✅ Seed dev data hoàn tất!\n\nManager email: ' + MANAGER_EMAIL +
-    '\n\nNếu chưa đổi email → sửa MANAGER_EMAIL trong gas_seed_dev.gs rồi xóa dòng USERS và chạy lại.')
+  try {
+    SpreadsheetApp.getUi().alert('✅ Seed dev data hoàn tất!\n\nManager email: ' + MANAGER_EMAIL +
+      '\n\nNếu chưa đổi email → sửa MANAGER_EMAIL trong gas_seed_dev.gs rồi xóa dòng USERS và chạy lại.')
+  } catch (e) { Logger.log('(headless) ' + e.message) }
 }
