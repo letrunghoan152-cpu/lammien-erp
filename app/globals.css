@@ -9,38 +9,44 @@
 
 /* ─── Design Tokens (Section 15.2) ───────────────────────────────────────────── */
 :root {
-  /* Nền */
-  --bg: #f5f6f4;
-  --panel: #ffffff;
-  --panel-2: #f4f5f2;
-  --panel-3: #eaece7;
+  /* Nền (dark — theo design "Order Hub.dc.html") */
+  --bg: #14150f;
+  --panel: #1c1e16;
+  --panel-2: #23251c;
+  --panel-3: #2c2e24;
   /* Viền */
-  --line: #e3e6e0;
-  --line-soft: #eef0ec;
+  --line: #30332a;
+  --line-soft: #26281f;
   /* Chữ */
-  --text: #1f2418;
-  --muted: #5f6857;
-  --muted-2: #8b9282;
+  --text: #e9eae2;
+  --muted: #9aa08d;
+  --muted-2: #6f7565;
   /* Brand */
   --brand: #6d8150;
-  --brand-600: #5c6e43;
-  --brand-700: #4d5c38;
-  --brand-soft: rgba(109, 129, 80, .14);
+  --brand-light: #93ab6e;   /* accent/hover/text trên nền tối */
+  --brand-600: #7d9460;
+  --brand-700: #93ab6e;
+  --brand-soft: rgba(109, 129, 80, .16);
   /* Mở rộng */
-  --purple: #6c71c4;
-  /* Ngữ nghĩa */
-  --red: #c0503f;
-  --red-soft: rgba(192, 80, 63, .12);
-  --green: #5e7d3e;
-  --amber: #a9802f;
-  --blue: #3f7e93;
+  --purple: #9b9fe0;
+  /* Ngữ nghĩa (đã làm sáng cho nền tối) */
+  --red: #d2654f;
+  --red-soft: rgba(210, 101, 79, .14);
+  --green: #8fb45f;
+  --amber: #d2a857;
+  --blue: #5fa6bd;
   /* Bo góc */
   --radius: 14px;
   --radius-sm: 10px;
-  /* Đổ bóng */
-  --shadow-sm: 0 1px 2px rgba(31, 36, 24, .05), 0 1px 1px rgba(31, 36, 24, .04);
-  --shadow: 0 8px 24px rgba(31, 36, 24, .12), 0 2px 6px rgba(31, 36, 24, .06);
+  /* Đổ bóng (dark) */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, .25);
+  --shadow: 0 12px 40px rgba(0, 0, 0, .45);
 }
+
+/* Scrollbar tối */
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #2c2e24; border-radius: 8px; }
 
 /* ─── Reset ──────────────────────────────────────────────────────────────────── */
 * { box-sizing: border-box; }
@@ -53,7 +59,7 @@ body {
   background: var(--bg);
   -webkit-font-smoothing: antialiased;
 }
-a { color: var(--brand-700); text-decoration: none; }
+a { color: var(--brand-light); text-decoration: none; }
 a:hover { text-decoration: underline; }
 button { font-family: inherit; cursor: pointer; }
 img { max-width: 100%; }
@@ -83,7 +89,7 @@ img { max-width: 100%; }
   font-size: 14px; font-weight: 600;
   transition: background .15s ease, transform .08s ease, opacity .15s ease;
 }
-.btn:hover { background: var(--brand-600); border-color: var(--brand-600); text-decoration: none; }
+.btn:hover { background: var(--brand-light); border-color: var(--brand-light); text-decoration: none; }
 .btn:active { background: var(--brand-700); }
 .btn:disabled { opacity: .45; cursor: not-allowed; }
 .btn.ghost { background: transparent; color: var(--text); border-color: var(--line); }
@@ -100,7 +106,7 @@ img { max-width: 100%; }
   font-size: 14px; font-family: inherit;
   transition: border-color .15s ease, box-shadow .15s ease;
 }
-.input:focus { outline: none; border-color: var(--brand); box-shadow: 0 0 0 3px var(--brand-soft); }
+.input:focus { outline: none; border-color: var(--brand-light); box-shadow: 0 0 0 3px var(--brand-soft); }
 .input::placeholder { color: var(--muted-2); }
 textarea.input { height: auto; min-height: 88px; padding: 10px 12px; resize: vertical; line-height: 1.5; }
 .input:disabled { background: var(--panel-2); color: var(--muted); }
@@ -134,7 +140,7 @@ select.input {
   background: var(--panel-2); color: var(--muted);
   font-size: 12px; font-weight: 500;
 }
-.tag.active { background: var(--brand-soft); color: var(--brand); }
+.tag.active { background: var(--brand-soft); color: var(--brand-light); }
 
 /* ─── Row (flex ngang) ───────────────────────────────────────────────────────── */
 .row { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
@@ -156,7 +162,7 @@ select.input {
 .finance-row + .finance-row { border-top: 1px solid var(--line-soft); }
 .finance-row .lbl { color: var(--muted); font-size: 13px; }
 .finance-row .val { font-weight: 700; font-variant-numeric: tabular-nums; }
-.finance-row.total .val { font-size: 18px; color: var(--brand-700); }
+.finance-row.total .val { font-size: 18px; color: var(--brand-light); }
 
 /* ─── Note box ───────────────────────────────────────────────────────────────── */
 .note-box {
@@ -200,7 +206,7 @@ table.tbl tbody tr:hover { background: var(--panel-2); }
 /* ─── Avatar (Section 15.17B) ────────────────────────────────────────────────── */
 .avatar {
   width: 36px; height: 36px; border-radius: 50%; object-fit: cover;
-  background: var(--brand-soft); color: var(--brand);
+  background: var(--brand-soft); color: var(--brand-light);
   font-size: 13px; font-weight: 700; flex: none;
   display: inline-flex; align-items: center; justify-content: center;
   overflow: hidden;
@@ -288,7 +294,7 @@ table.tbl tbody tr:hover { background: var(--panel-2); }
 /* ─── Toast (Section 15.4) ───────────────────────────────────────────────────── */
 .toast-wrap { position: fixed; bottom: 20px; right: 20px; z-index: 200; display: flex; flex-direction: column; gap: 8px; }
 .toast {
-  background: var(--text); color: #fff;
+  background: var(--brand); color: #fff;
   border-radius: var(--radius-sm); padding: 11px 16px;
   font-size: 13.5px; box-shadow: var(--shadow); max-width: 340px;
 }
@@ -380,8 +386,8 @@ table.tbl tbody tr:hover { background: var(--panel-2); }
   background: var(--panel-2); border: 1px solid var(--line); color: var(--muted-2);
 }
 .timeline.mini .tl-dot { width: 12px; height: 12px; }
-.tl-dot.done { background: var(--brand); border-color: var(--brand); color: #fff; }
-.tl-dot.current { background: var(--brand-soft); border: 2px solid var(--brand); color: var(--brand); }
+.tl-dot.done { background: var(--brand); border-color: var(--brand-light); color: #fff; }
+.tl-dot.current { background: var(--brand-soft); border: 2px solid var(--brand); color: var(--brand-light); }
 .tl-dot.paused { background: rgba(169, 128, 47, .14); border-color: var(--amber); color: var(--amber); }
 .tl-label { font-size: 11px; margin-top: 6px; color: var(--muted); text-align: center; line-height: 1.2; }
 .timeline.tl-cancel { opacity: .45; }
@@ -391,7 +397,7 @@ table.tbl tbody tr:hover { background: var(--panel-2); }
 .slide-panel {
   position: fixed; top: 0; right: 0; height: 100vh; width: 340px; max-width: 92vw;
   background: var(--panel); border-left: 1px solid var(--line); box-shadow: var(--shadow);
-  z-index: 80; padding: 18px; overflow-y: auto;
+  z-index: 80; padding: 20px; overflow-y: auto;
 }
 @media (max-width: 640px) {
   .panel-scrim { background: rgba(0, 0, 0, .35); pointer-events: auto; }
