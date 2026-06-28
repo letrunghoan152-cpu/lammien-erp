@@ -46,10 +46,20 @@ export const cache = {
   },
 }
 
+// Khoá KHÔNG được xoá khi invalidate 'all' — nếu xoá sẽ mất credential → báo "hết phiên"
+// ngay sau khi lưu (lm_session vốn ở localStorage, gis_id_token phòng trường hợp fallback).
+const PROTECTED_KEYS = ['lm_session', 'gis_id_token']
+
 /** Invalidate cache theo nhóm dữ liệu sau mutation */
 export function invalidateCache(group: 'orders' | 'customers' | 'calendar' | 'services' | 'notifications' | 'all') {
   if (group === 'all') {
-    if (typeof window !== 'undefined') sessionStorage.clear()
+    if (typeof window === 'undefined') return
+    const toDel: string[] = []
+    for (let i = 0; i < sessionStorage.length; i++) {
+      const k = sessionStorage.key(i)
+      if (k && PROTECTED_KEYS.indexOf(k) === -1) toDel.push(k)
+    }
+    toDel.forEach((k) => sessionStorage.removeItem(k))
     return
   }
   cache.delPrefix(group)

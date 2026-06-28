@@ -3,7 +3,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { renderSignInButton, getStoredToken } from '@/lib/auth'
+import { renderSignInButton, hasCredential } from '@/lib/auth'
 import { gasPing } from '@/lib/gasApi'
 import { IS_CONFIGURED, GAS_URL, GOOGLE_CLIENT_ID } from '@/lib/config'
 
@@ -14,7 +14,7 @@ export default function LoginPage() {
 
   useEffect(() => {
     // Đã có phiên hợp lệ → vào thẳng dashboard
-    if (getStoredToken()) { router.replace('/orders'); return }
+    if (hasCredential()) { router.replace('/orders'); return }
 
     // Hiển thị lỗi nếu redirect callback trả về ?auth_error=
     const params = new URLSearchParams(window.location.search)

@@ -16,9 +16,15 @@
 // GAS Web App LUÔN trả HTTP 200. Lỗi nghiệp vụ nhúng vào JSON body.
 // Client phải đọc body.ok để biết thành công hay thất bại.
 
+// Token session mới cần đẩy về client (cấp mới / gia hạn). doPost gán trước khi route;
+// jsonOk tự kèm vào envelope. GAS chạy mới mỗi request nên biến này an toàn theo từng lần gọi.
+var _SESSION_REFRESH = null
+
 function jsonOk(data) {
+  var env = { ok: true, data: data }
+  if (_SESSION_REFRESH) env.session = _SESSION_REFRESH
   return ContentService
-    .createTextOutput(JSON.stringify({ ok: true, data: data }))
+    .createTextOutput(JSON.stringify(env))
     .setMimeType(ContentService.MimeType.JSON)
 }
 

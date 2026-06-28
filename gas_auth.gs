@@ -9,75 +9,126 @@
  *   - role.manage / role.create hard-check (không thể cấp cho non-Manager)
  */
 
+// ─── Session token (chống "hết phiên" khi đang thao tác) ──────────────────────
+// Google id_token chỉ sống 1 giờ và GIS redirect KHÔNG có cơ chế refresh ngầm →
+// sau ~1h thao tác là báo hết phiên. Giải pháp: ngay lần xác thực Google đầu tiên,
+// đổi id_token lấy 1 "session token" do GAS ký HMAC, sống 7 ngày + tự gia hạn trượt
+// mỗi khi user còn hoạt động. Các request sau gửi session token này → KHÔNG cần
+// gọi lại Google, KHÔNG dính hạn 1h. (PRD Section 13.2 vẫn dùng id_token cho lần đầu.)
+
+var SESSION_PREFIX = 'lm1.'
+var SESSION_TTL_SEC = 7 * 24 * 3600        // session sống 7 ngày
+var SESSION_RENEW_SEC = 3 * 24 * 3600      // còn < 3 ngày → cấp token mới (sliding window)
+
+function getSessionSecret() {
+  var props = PropertiesService.getScriptProperties()
+  var s = props.getProperty('SESSION_SECRET')
+  if (!s) {
+    // Tự sinh secret lần đầu, lưu vĩnh viễn. Đổi secret = vô hiệu mọi phiên.
+    s = Utilities.getUuid().replace(/-/g, '') + Utilities.getUuid().replace(/-/g, '')
+    props.setProperty('SESSION_SECRET', s)
+  }
+  return s
+}
+
+function _b64url(bytes) {
+  return Utilities.base64EncodeWebSafe(bytes).replace(/=+$/, '')
+}
+function _sessionSig(payloadB64) {
+  return _b64url(Utilities.computeHmacSha256Signature(payloadB64, getSessionSecret()))
+}
+
+function mintSessionToken(email) {
+  var now = Math.floor(Date.now() / 1000)
+  var payload = JSON.stringify({ e: email, t: now, x: now + SESSION_TTL_SEC })
+  var p = _b64url(Utilities.newBlob(payload).getBytes())
+  return SESSION_PREFIX + p + '.' + _sessionSig(p)
+}
+
+/** Trả { email, renew } nếu hợp lệ; null nếu sai chữ ký / hết hạn / sai định dạng. */
+function verifySessionToken(token) {
+  if (!token || token.indexOf(SESSION_PREFIX) !== 0) return null
+  var parts = token.slice(SESSION_PREFIX.length).split('.')
+  if (parts.length !== 2) return null
+  if (_sessionSig(parts[0]) !== parts[1]) return null   // sai chữ ký → không thể giả mạo
+  var payload
+  try {
+    var b = parts[0]
+    while (b.length % 4) b += '='   // bù padding đã bị strip lúc mint
+    payload = JSON.parse(Utilities.newBlob(Utilities.base64DecodeWebSafe(b)).getDataAsString())
+  } catch (e) { return null }
+  var now = Math.floor(Date.now() / 1000)
+  if (!payload.e || !payload.x || now > payload.x) return null
+  return { email: payload.e, renew: (payload.x - now) < SESSION_RENEW_SEC }
+}
+
 // ─── Xác thực token Google ────────────────────────────────────────────────────
 
 /**
- * Verify Google id_token và trả về { user, permissions }
- * @param {string} idToken - Google id_token từ GIS (Sign In With Google)
- * @returns {{ user: object, permissions: string[] }}
- * @throws string message nếu token không hợp lệ
+ * Verify token (Google id_token HOẶC session token của hệ thống) → user + permissions.
+ * @param {string} token - id_token GIS (lần đầu) hoặc 'lm1.<payload>.<sig>' (các lần sau)
+ * @returns {{ user: object, permissions: string[], sessionToken: string|null }}
+ *          sessionToken !== null nghĩa là client nên lưu lại token mới (cấp/gia hạn).
+ * @throws { status, message } nếu token không hợp lệ
  */
-function verifyAndGetUser(idToken) {
-  if (!idToken || typeof idToken !== 'string' || idToken.length < 20) {
+function verifyAndGetUser(token) {
+  if (!token || typeof token !== 'string' || token.length < 20) {
     throw { status: 401, message: 'Token không hợp lệ hoặc thiếu' }
   }
 
-  // Cache key: MD5 hash của toàn bộ token — không dùng slice(-20)
-  // Lý do: 20 ký tự cuối JWT có thể collide → sai user identity → privilege escalation
-  const tokenHash = Utilities.computeDigest(
-    Utilities.DigestAlgorithm.MD5,
-    idToken,
-    Utilities.Charset.UTF_8
-  ).map(b => (b & 0xff).toString(16).padStart(2, '0')).join('')
+  var email = null
+  var sessionToken = null   // token để gửi lại client (cấp mới / gia hạn trượt)
 
-  const cacheKey = 'tok_' + tokenHash
-  let email = cacheGet(cacheKey)
+  if (token.indexOf(SESSION_PREFIX) === 0) {
+    // ── Đường nhanh: session token của hệ thống → verify HMAC, không gọi Google ──
+    var sess = verifySessionToken(token)
+    if (!sess) throw { status: 401, message: 'Phiên đã hết hạn — vui lòng đăng nhập lại' }
+    email = sess.email
+    if (sess.renew) sessionToken = mintSessionToken(email)  // gia hạn khi gần hết hạn
+  } else {
+    // ── Lần đầu: Google id_token → verify qua tokeninfo (có cache) rồi cấp session token ──
+    var tokenHash = Utilities.computeDigest(
+      Utilities.DigestAlgorithm.MD5, token, Utilities.Charset.UTF_8
+    ).map(function (b) { return (b & 0xff).toString(16).padStart(2, '0') }).join('')
+    var cacheKey = 'tok_' + tokenHash
+    email = cacheGet(cacheKey)
 
-  if (!email) {
-    // Gọi Google tokeninfo — bắt buộc muteHttpExceptions + try-catch
-    let res
-    try {
-      res = UrlFetchApp.fetch(
-        'https://oauth2.googleapis.com/tokeninfo?id_token=' + encodeURIComponent(idToken),
-        { muteHttpExceptions: true } // không throw khi 4xx/5xx — luôn nhận response object
-      )
-    } catch (fetchErr) {
-      // Lỗi mạng thực sự (DNS fail, no internet)
-      console.error('UrlFetchApp error:', fetchErr.message)
-      throw { status: 503, message: 'Dịch vụ xác thực tạm thời không khả dụng — thử lại sau' }
+    if (!email) {
+      var res
+      try {
+        res = UrlFetchApp.fetch(
+          'https://oauth2.googleapis.com/tokeninfo?id_token=' + encodeURIComponent(token),
+          { muteHttpExceptions: true }
+        )
+      } catch (fetchErr) {
+        console.error('UrlFetchApp error:', fetchErr.message)
+        throw { status: 503, message: 'Dịch vụ xác thực tạm thời không khả dụng — thử lại sau' }
+      }
+      var httpCode = res.getResponseCode()
+      if (httpCode !== 200) {
+        console.warn('tokeninfo HTTP ' + httpCode)
+        throw { status: httpCode >= 500 ? 503 : 401, message: 'Xác thực token thất bại (HTTP ' + httpCode + ')' }
+      }
+      var tokenInfo
+      try { tokenInfo = JSON.parse(res.getContentText()) }
+      catch (parseErr) { throw { status: 503, message: 'Phản hồi xác thực không hợp lệ' } }
+      if (tokenInfo.error || !tokenInfo.email) {
+        throw { status: 401, message: 'Token không hợp lệ: ' + (tokenInfo.error_description || 'email thiếu') }
+      }
+      email = tokenInfo.email
+      cacheSet(cacheKey, email, 300)
     }
-
-    const httpCode = res.getResponseCode()
-    if (httpCode !== 200) {
-      // 400 = token sai format/hết hạn, 5xx = Google service down
-      console.warn('tokeninfo HTTP ' + httpCode)
-      throw { status: httpCode >= 500 ? 503 : 401, message: 'Xác thực token thất bại (HTTP ' + httpCode + ')' }
-    }
-
-    let tokenInfo
-    try {
-      tokenInfo = JSON.parse(res.getContentText())
-    } catch (parseErr) {
-      throw { status: 503, message: 'Phản hồi xác thực không hợp lệ' }
-    }
-
-    if (tokenInfo.error || !tokenInfo.email) {
-      throw { status: 401, message: 'Token không hợp lệ: ' + (tokenInfo.error_description || 'email thiếu') }
-    }
-
-    email = tokenInfo.email
-    cacheSet(cacheKey, email, 300) // cache 5 phút
+    sessionToken = mintSessionToken(email)   // đổi id_token lấy session 7 ngày
   }
 
-  // Lookup user từ USERS sheet
-  const user = getUserByEmail(email)
+  // Lookup user từ USERS sheet (cache 5'); is_active check mỗi request → vô hiệu hoá tức thì
+  var user = getUserByEmail(email)
   if (!user) throw { status: 401, message: 'Tài khoản không tồn tại: ' + email }
   if (!user.is_active) throw { status: 401, message: 'Tài khoản đã bị vô hiệu hóa' }
 
-  // Load permissions
-  const permissions = getCachedPermissions(user.role_id)
+  var permissions = getCachedPermissions(user.role_id)
 
-  return { user, permissions }
+  return { user: user, permissions: permissions, sessionToken: sessionToken }
 }
 
 // ─── User Lookup ──────────────────────────────────────────────────────────────

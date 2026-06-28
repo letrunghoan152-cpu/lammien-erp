@@ -3,7 +3,7 @@
 // KHÔNG dùng res.status để detect lỗi.
 
 import { GAS_URL } from './config'
-import { getIdToken } from './auth'
+import { getAuthToken, setSession } from './auth'
 
 export interface GasError extends Error {
   appStatus?: number
@@ -30,7 +30,7 @@ export async function gasApi<T = any>(action: string, params: Params = {}): Prom
   if (!GAS_URL) {
     throw Object.assign(new Error('Chưa cấu hình NEXT_PUBLIC_GAS_URL'), { appStatus: 0 }) as GasError
   }
-  const token = await getIdToken()
+  const token = await getAuthToken()
 
   let res: Response
   try {
@@ -50,6 +50,9 @@ export async function gasApi<T = any>(action: string, params: Params = {}): Prom
     // GAS trả HTML (thường do lỗi deploy / quyền) thay vì JSON
     throw Object.assign(new Error('GAS trả về dữ liệu không hợp lệ (kiểm tra deploy/quyền)'), { appStatus: 502 }) as GasError
   }
+
+  // GAS đính kèm session token mới (cấp lần đầu / gia hạn trượt) → lưu lại để dùng tiếp.
+  if (body && body.session) setSession(body.session)
 
   if (!body || body.ok !== true) {
     const err: GasError = Object.assign(new Error(body?.error || 'Lỗi GAS không xác định'), {

@@ -3,12 +3,12 @@
 
 import { useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { getStoredToken } from '@/lib/auth'
+import { hasCredential } from '@/lib/auth'
 
 export default function Home() {
   const router = useRouter()
   useEffect(() => {
-    router.replace(getStoredToken() ? '/orders' : '/login')
+    router.replace(hasCredential() ? '/orders' : '/login')
   }, [router])
   return (
     <div className="center">

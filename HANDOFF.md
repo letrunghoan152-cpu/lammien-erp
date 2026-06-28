@@ -13,12 +13,19 @@ Hệ thống quản lý vận hành studio ảnh đa cơ sở. **Next.js (Vercel
 | 1 | Sheets + CSDL (19 tab, RBAC seed, auth, utils) | ✅ |
 | 2 | Order Hub + Booking Form | ✅ deploy |
 | 3 | Phân quyền (RBAC) + Nhân sự + Cơ sở + Cài đặt | ✅ deploy |
-| **4** | **Danh mục dịch vụ + Add-on + Voucher (quản lý)** | ⏳ **làm tiếp** |
-| 5 | Lương + Thưởng/Phạt | ⏳ stub |
+| **4** | **Danh mục dịch vụ + Add-on + Voucher (quản lý)** | ✅ code (chờ deploy) |
+| **5** | **Lương + Thưởng/Phạt** | ✅ code (chờ deploy) |
 | 6 | Hậu kỳ Tracker + tích hợp webapp chọn ảnh | ⏳ stub |
 | 7 | Finance + Dashboard + CRM | ⏳ stub |
 
-**Đã chạy production**, đăng nhập OK cho mọi nhân sự. Việc tiếp theo: **Phase 4**.
+**Đã chạy production**, đăng nhập OK cho mọi nhân sự. Việc tiếp theo: **Phase 6**.
+
+### Mới (chat này, chưa deploy lúc viết — build & syntax-check OK)
+- **Sửa "hết phiên đăng nhập"** (2 nguyên nhân):
+  1. Google id_token chỉ sống 1h, không refresh → GAS giờ đổi id_token lấy **session token HMAC sống 7 ngày, tự gia hạn trượt** (`gas_auth.gs`: `mintSessionToken/verifySessionToken`; secret tự sinh & lưu ở Script Property `SESSION_SECRET`). Token mới đẩy về client qua `envelope.session`; client lưu ở **localStorage** (`lib/auth.ts` `getAuthToken/getStoredSession/hasCredential`, `lib/gasApi.ts`).
+  2. `invalidateCache('all')` gọi `sessionStorage.clear()` → **xoá luôn token** → báo hết phiên ngay sau khi lưu. Đã đổi để chừa key `lm_session`/`gis_id_token` (`lib/cache.ts`).
+- **Phase 4**: `gas_catalog_manage.gs` — `catalog.manageList` · `services.upsert` · `addons.upsert` · `vouchers.upsert` · `vouchers.apply` (mặc định chỉ báo giá; `commit=true` mới tăng `used_count` trong LockService — **orders.create chưa tự tăng used_count**). UI `app/(dashboard)/catalog/page.tsx` (3 tab).
+- **Phase 5**: `gas_salary.gs` — `salary.list` (tính live theo kỳ) · `salary.compute` (snapshot+khoá vào SALARY) · `bonus_penalty.list/upsert`. Lương theo PRD §9 (concept hệ số 1.0/0.5, hậu kỳ rate×file, add-on theo commission_role, thưởng−phạt). UI `app/(dashboard)/salary/page.tsx`. **Lưu ý**: kỳ = tháng `shoot_date`; chỉ tính đơn `STATUS_ORDER_INDEX>=4` & ≠HUY.
 
 ---
 
@@ -135,9 +142,9 @@ USERS: manager(`letrunghoan152@gmail.com`)+sale/photographer/mua/hau_ky/support(
 ---
 
 ## 8. Việc còn lại
-- [ ] **Phase 4** (kế tiếp): UI `/catalog` + `services/addons/vouchers.upsert` + `vouchers.apply`.
-- [ ] Phase 5: Lương (`salary.list/compute`, `bonus_penalty.upsert`) + trang `/salary`.
-- [ ] Phase 6: Hậu kỳ/Album/Shipping + webhook chọn ảnh (đặt `webhook_secret` trong SETTINGS).
+- [ ] **Deploy Phase 4-5 + fix session**: push GAS (`clasp push --force` + `redeploy`) và git push frontend. Backward-compatible (deploy thứ tự nào trước cũng OK). Không thêm scope mới (PropertiesService/Utilities không cần authorize lại).
+- [ ] Phase 6: Hậu kỳ/Album/Shipping + webhook chọn ảnh (đặt `webhook_secret` trong SETTINGS). Khi đó `salary` mới có `hk_file_total` (cần HAU_KY_TASK status DONE + photo_count).
+- [ ] (tuỳ) Tăng `VOUCHER.used_count` ngay trong `orders.create` để enforce `max_uses` ở lúc tạo đơn (hiện chỉ `vouchers.apply?commit=true`).
 - [ ] Phase 7: Finance + Dashboard + CRM.
 - [ ] Cập nhật thông tin thật: LOCATIONS (địa chỉ/SĐT), thêm USERS nhân sự thật.
 

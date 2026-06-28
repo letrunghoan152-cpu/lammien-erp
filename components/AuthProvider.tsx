@@ -3,7 +3,7 @@
 
 import { createContext, useContext, useEffect, useState, ReactNode, useCallback } from 'react'
 import { gasApi, GasError } from '@/lib/gasApi'
-import { getStoredToken, signOut as gisSignOut } from '@/lib/auth'
+import { hasCredential, signOut as gisSignOut } from '@/lib/auth'
 import { cache } from '@/lib/cache'
 import { AuthUser } from '@/lib/types'
 
@@ -35,8 +35,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [error, setError] = useState<GasError | null>(null)
 
   const verify = useCallback(() => {
-    const token = getStoredToken()
-    if (!token) { setUser(null); setPermissions(new Set()); setReady(true); return }
+    if (!hasCredential()) { setUser(null); setPermissions(new Set()); setReady(true); return }
 
     // dùng cache phiên để tránh verify lại mỗi điều hướng
     const cached = cache.get<{ user: AuthUser; permissions: string[] }>(CACHE_KEY)

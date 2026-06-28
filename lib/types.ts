@@ -182,6 +182,60 @@ export interface AddonCatalog {
   commission_value: number
   commission_role: string | null
   cost_price?: number
+  is_active?: boolean
+}
+
+// ── Phase 4: Quản lý danh mục ──
+export interface CatalogManageResponse {
+  services: Service[]
+  addons: AddonCatalog[]
+  vouchers: Voucher[]
+  can: {
+    services: boolean
+    addons: boolean
+    addon_mua: boolean
+    vouchers: boolean
+    cost: boolean
+    salary: boolean
+  }
+}
+
+// ── Phase 5: Lương + Thưởng/Phạt ──
+export interface SalaryLine { kind: string; label: string; amount: number }
+export interface SalaryRow {
+  staff_id: string
+  name: string
+  role_id: string
+  base_salary: number
+  concept_total: number
+  hk_file_total: number
+  addon_total: number
+  bonus_total: number
+  penalty_total: number
+  gross_total: number
+  is_locked?: boolean
+  lines: SalaryLine[]
+}
+export interface SalaryListResponse {
+  period: string
+  salary: SalaryRow[]
+  can_manage: boolean
+  can_bonus: boolean
+  can_view_all: boolean
+}
+export interface BonusPenalty {
+  bp_id: string
+  staff_id: string
+  staff_name?: string
+  type: 'BONUS' | 'PENALTY'
+  amount: number
+  note: string
+  date: string
+  order_id: string
+}
+export interface BonusPenaltyListResponse {
+  items: BonusPenalty[]
+  staff: { user_id: string; name: string }[]
 }
 
 export interface Notif {

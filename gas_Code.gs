@@ -68,11 +68,13 @@ function doPost(e) {
     const idToken = params.token
     if (!idToken) return jsonError(401, 'Thiếu token xác thực')
 
+    _SESSION_REFRESH = null   // reset; verify sẽ set nếu cần cấp/gia hạn session token
     let user, permissions
     try {
       const auth = verifyAndGetUser(idToken)
       user = auth.user
       permissions = auth.permissions
+      if (auth.sessionToken) _SESSION_REFRESH = auth.sessionToken
     } catch (authErr) {
       const status = authErr.status || 401
       return jsonError(status, authErr.message || 'Xác thực thất bại')
@@ -132,6 +134,7 @@ function route(action, params, user, permissions) {
       case 'vouchers.apply':  return actionVouchersApply(params, user, permissions)
       case 'locations.list':   return actionLocationsList(params, user, permissions)
       case 'locations.upsert': return actionLocationsUpsert(params, user, permissions)
+      case 'catalog.manageList': return actionCatalogManageList(params, user, permissions)
       case 'bootstrap':        return actionBootstrap(params, user, permissions)
 
       // Hậu Kỳ & Album
@@ -149,6 +152,7 @@ function route(action, params, user, permissions) {
       case 'finance.debt':          return actionFinanceDebt(params, user, permissions)
       case 'salary.list':           return actionSalaryList(params, user, permissions)
       case 'salary.compute':        return actionSalaryCompute(params, user, permissions)
+      case 'bonus_penalty.list':    return actionBonusPenaltyList(params, user, permissions)
       case 'bonus_penalty.upsert':  return actionBonusPenaltyUpsert(params, user, permissions)
 
       // Nhân sự & Phân quyền
@@ -384,24 +388,8 @@ function keepAlive() {
 //    Implement đầy đủ trong gas_orders.gs, gas_customers.gs, gas_calendar.gs, gas_catalog.gs
 //    (các stub Phase 2 trước đây đã được gỡ bỏ để tránh trùng tên hàm)
 
-function actionServicesUpsert(p, u, perms) {
-  requirePermission(perms, 'service_catalog.manage')
-  return jsonOk({ _note: 'Phase 3 — chưa implement' })
-}
-// actionAddonsList / actionAddonsListMuaProducts → implement trong gas_catalog.gs
-function actionAddonsUpsert(p, u, perms) {
-  requirePermission(perms, 'addon.manage_all')
-  return jsonOk({ _note: 'Phase 4 — chưa implement' })
-}
-// actionVouchersList → implement trong gas_catalog.gs
-function actionVouchersUpsert(p, u, perms) {
-  requirePermission(perms, 'voucher.manage')
-  return jsonOk({ _note: 'Phase 4 — chưa implement' })
-}
-function actionVouchersApply(p, u, perms) {
-  requirePermission(perms, 'order.create_edit')
-  return jsonOk({ _note: 'Phase 4 — chưa implement' })
-}
+// actionServicesUpsert / actionAddonsUpsert / actionVouchersUpsert / actionVouchersApply
+// / actionCatalogManageList → implement đầy đủ trong gas_catalog_manage.gs (Phase 4)
 function actionHaukyList(p, u, perms) {
   requirePermission(perms, 'hau_ky.view_all')
   return jsonOk({ tasks: [], _note: 'Phase 6 — chưa implement' })
@@ -442,18 +430,8 @@ function actionFinanceDebt(p, u, perms) {
   requirePermission(perms, 'finance.view_all')
   return jsonOk({ _note: 'Phase 7 — chưa implement' })
 }
-function actionSalaryList(p, u, perms) {
-  requirePermission(perms, perms.has('salary.view_all') ? 'salary.view_all' : 'salary.view_own')
-  return jsonOk({ salary: [], _note: 'Phase 5 — chưa implement' })
-}
-function actionSalaryCompute(p, u, perms) {
-  requirePermission(perms, 'salary.manage_config')
-  return jsonOk({ _note: 'Phase 5 — chưa implement' })
-}
-function actionBonusPenaltyUpsert(p, u, perms) {
-  requirePermission(perms, 'bonus_penalty.manage')
-  return jsonOk({ _note: 'Phase 5 — chưa implement' })
-}
+// actionSalaryList / actionSalaryCompute / actionBonusPenaltyList / actionBonusPenaltyUpsert
+// → implement đầy đủ trong gas_salary.gs (Phase 5)
 // actionUsersList / actionUsersUpsert / actionRolesList / actionRolesUpsert
 // / actionPermissionsUpdate → implement đầy đủ trong gas_admin.gs (Phase 3)
 
