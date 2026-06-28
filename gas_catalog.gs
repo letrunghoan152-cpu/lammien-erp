@@ -180,7 +180,7 @@ function actionBootstrap(p, u, perms) {
   return jsonOk(data)
 }
 
-function invalidateBootstrap() { cacheDel('bootstrap_v1') }
+function invalidateBootstrap() { cacheDel('bootstrap_v1'); cacheDel('map_svc') }
 
 // ─── locations.list (bổ sung — cần cho dropdown cơ sở khắp hệ thống) ──────────
 

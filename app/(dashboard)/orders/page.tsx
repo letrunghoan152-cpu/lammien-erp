@@ -171,6 +171,7 @@ export default function OrdersPage() {
 
       <OrderSlidePanel
         orderId={selectedId}
+        seed={orders.find((o) => o.order_id === selectedId) || null}
         onClose={() => setSelectedId(null)}
         onChanged={(id, newStatus) => {
           setOrders((prev) => prev.map((o) => (o.order_id === id ? { ...o, status: newStatus } : o)))

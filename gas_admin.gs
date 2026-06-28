@@ -223,7 +223,7 @@ function actionUsersUpsert(p, u, perms) {
         var oldEmail = String(rows[i][COL.USERS.email]).toLowerCase()
         row[COL.USERS.user_id] = rows[i][COL.USERS.user_id]
         sheet.getRange(i + 1, 1, 1, row.length).setValues([row])
-        cacheDel('usr_' + oldEmail); cacheDel('usr_' + email); cacheDel('uid_' + row[COL.USERS.user_id])
+        cacheDel('usr_' + oldEmail); cacheDel('usr_' + email); cacheDel('uid_' + row[COL.USERS.user_id]); cacheDel('map_users')
         return jsonOk({ user_id: row[COL.USERS.user_id] })
       }
     }
@@ -232,7 +232,7 @@ function actionUsersUpsert(p, u, perms) {
     var userId = generateId('usr')
     row[COL.USERS.user_id] = userId
     appendRow('USERS', row)
-    cacheDel('usr_' + email)
+    cacheDel('usr_' + email); cacheDel('map_users')
     return jsonOk({ user_id: userId })
   })
 }
@@ -256,7 +256,7 @@ function actionLocationsUpsert(p, u, perms) {
       for (var i = 1; i < rows.length; i++) {
         if (rows[i][COL.LOCATIONS.location_id] === data.location_id) {
           sheet.getRange(i + 1, 1, 1, newRow.length).setValues([newRow])
-          invalidateBootstrap(); _locationNameMap = null
+          invalidateBootstrap(); cacheDel('map_locs'); _locationNameMap = null
           return jsonOk({ location_id: data.location_id })
         }
       }

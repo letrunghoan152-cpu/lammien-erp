@@ -104,7 +104,7 @@ function actionCustomersUpsert(p, u, perms) {
         if (data.tags !== undefined) sheet.getRange(i + 1, COL.CUSTOMERS.tags + 1).setValue(serializeList(data.tags))
         if (data.notes !== undefined) sheet.getRange(i + 1, COL.CUSTOMERS.notes + 1).setValue(data.notes)
         if (data.avatar_url !== undefined) sheet.getRange(i + 1, COL.CUSTOMERS.avatar_url + 1).setValue(data.avatar_url || '')
-        _customerAvatarMap = null
+        _customerAvatarMap = null; cacheDel('map_avatars')
         return jsonOk({ customer_id: rows[i][COL.CUSTOMERS.customer_id] })
       }
     }

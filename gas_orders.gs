@@ -116,29 +116,40 @@ function getAddonsByOrder(orderId) {
 }
 
 // Map user_id → name (cache nhẹ trong 1 request)
+// Reference map cache (CacheService): tránh đọc lại toàn bộ sheet mỗi request.
+// Xoá bằng cacheDel('map_*') ở các handler upsert tương ứng.
+function _cacheSetSafe(key, obj, ttl) {
+  try { if (JSON.stringify(obj).length < 90000) cacheSet(key, obj, ttl) } catch (e) { /* quá lớn — bỏ qua */ }
+}
+
 var _userNameMap = null
 function userNameMap() {
   if (_userNameMap) return _userNameMap
+  var c = cacheGet('map_users'); if (c) { _userNameMap = c; return c }
   _userNameMap = {}
   getAllRows('USERS').forEach(function (r) {
     _userNameMap[r[COL.USERS.user_id]] = r[COL.USERS.name]
   })
+  _cacheSetSafe('map_users', _userNameMap, 300)
   return _userNameMap
 }
 
 var _locationNameMap = null
 function locationNameMap() {
   if (_locationNameMap) return _locationNameMap
+  var c = cacheGet('map_locs'); if (c) { _locationNameMap = c; return c }
   _locationNameMap = {}
   getAllRows('LOCATIONS').forEach(function (r) {
     _locationNameMap[r[COL.LOCATIONS.location_id]] = r[COL.LOCATIONS.name]
   })
+  _cacheSetSafe('map_locs', _locationNameMap, 1800)
   return _locationNameMap
 }
 
 var _serviceMap = null
 function serviceMap() {
   if (_serviceMap) return _serviceMap
+  var c = cacheGet('map_svc'); if (c) { _serviceMap = c; return c }
   _serviceMap = {}
   getAllRows('SERVICE_CATALOG').forEach(function (r) {
     _serviceMap[r[COL.SERVICE_CATALOG.service_id]] = {
@@ -151,16 +162,19 @@ function serviceMap() {
       sample_photo_urls: parseList(r[COL.SERVICE_CATALOG.sample_photo_urls]),
     }
   })
+  _cacheSetSafe('map_svc', _serviceMap, 1800)
   return _serviceMap
 }
 
 var _customerAvatarMap = null
 function customerAvatarMap() {
   if (_customerAvatarMap) return _customerAvatarMap
+  var c = cacheGet('map_avatars'); if (c) { _customerAvatarMap = c; return c }
   _customerAvatarMap = {}
   getAllRows('CUSTOMERS').forEach(function (r) {
     _customerAvatarMap[r[COL.CUSTOMERS.customer_id]] = r[COL.CUSTOMERS.avatar_url] || null
   })
+  _cacheSetSafe('map_avatars', _customerAvatarMap, 300)
   return _customerAvatarMap
 }
 
@@ -965,6 +979,6 @@ function upsertCustomerByPhone(name, phone, data) {
     customerId, name, phone, data.email || '', data.source || '',
     serializeList(data.tags || []), data.notes || '', data.avatar_url || '', nowVN()
   ])
-  _customerAvatarMap = null
+  _customerAvatarMap = null; cacheDel('map_avatars')
   return customerId
 }

@@ -1,5 +1,6 @@
 'use client'
-// components/orders/OrderSlidePanel.tsx — panel trượt phải: đổi trạng thái ngay tại danh sách
+// components/orders/OrderSlidePanel.tsx — panel trượt phải: đổi trạng thái ngay tại danh sách.
+// Mở TỨC THÌ từ dữ liệu dòng (seed); orders.get tải nền để bổ sung ekip + nút chuyển trạng thái.
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
@@ -9,22 +10,20 @@ import { StatusPill } from '@/components/StatusPill'
 import { OrderTimeline } from './OrderTimeline'
 import OrderActions, { TransitionResp } from './OrderActions'
 import { money, fmtDay, dash } from '@/lib/format'
-import { OrderGetResponse } from '@/lib/types'
+import { OrderGetResponse, OrderListItem } from '@/lib/types'
 
 interface Props {
   orderId: string | null
+  seed?: OrderListItem | null   // dữ liệu dòng để hiện ngay, chưa cần đợi orders.get
   onClose: () => void
   onChanged?: (id: string, status: string) => void
 }
 
-export default function OrderSlidePanel({ orderId, onClose, onChanged }: Props) {
+export default function OrderSlidePanel({ orderId, seed, onClose, onChanged }: Props) {
   const [data, setData] = useState<OrderGetResponse | null>(null)
-  const [loading, setLoading] = useState(false)
 
   const load = (id: string) => {
-    setLoading(true)
-    gasApi<OrderGetResponse>('orders.get', { order_id: id })
-      .then(setData).catch(() => {}).finally(() => setLoading(false))
+    gasApi<OrderGetResponse>('orders.get', { order_id: id }).then(setData).catch(() => {})
   }
 
   useEffect(() => {
@@ -37,7 +36,17 @@ export default function OrderSlidePanel({ orderId, onClose, onChanged }: Props) 
   if (!orderId) return null
 
   const order = data?.order
-  const canFinancial = !!order && order.total_price !== undefined
+  // Nguồn hiển thị: ưu tiên dữ liệu đã fetch, fallback seed (hiện ngay khi click)
+  const name = order?.customer_name ?? seed?.customer_name ?? ''
+  const oid = order?.order_id ?? seed?.order_id ?? orderId
+  const avatarUrl = data?.customer_avatar_url ?? seed?.customer_avatar_url ?? null
+  const status = order?.status ?? seed?.status ?? ''
+  const locName = order?.location_name ?? seed?.location_name
+  const shootDate = order?.shoot_date ?? seed?.shoot_date ?? ''
+  const arrival = order?.arrival_time ?? seed?.arrival_time
+  const total = order?.total_price ?? seed?.total_price
+  const remaining = order?.remaining_amount ?? seed?.remaining_amount
+  const canFinancial = order ? order.total_price !== undefined : seed ? seed.total_price !== undefined : false
   const c0 = data?.concepts?.[0]
 
   const merge = (res: TransitionResp) => {
@@ -56,70 +65,69 @@ export default function OrderSlidePanel({ orderId, onClose, onChanged }: Props) 
     <>
       <div className="panel-scrim" onClick={onClose} />
       <aside className="slide-panel anim-slide-right" onClick={(e) => e.stopPropagation()}>
-        {!order ? (
-          <div>
-            <div className="row between" style={{ marginBottom: 14 }}>
-              <div className="shimmer sk-line" style={{ width: 120, height: 18 }} />
-              <button className="btn ghost sm" onClick={onClose}>✕</button>
+        <div className="row between" style={{ marginBottom: 10 }}>
+          <div className="row" style={{ gap: 10 }}>
+            <Avatar name={name} url={avatarUrl} size="md" />
+            <div style={{ minWidth: 0 }}>
+              <div style={{ fontWeight: 700 }}>{name}</div>
+              <div className="dim" style={{ fontSize: 12 }}>{oid}</div>
             </div>
-            {Array.from({ length: 5 }).map((_, i) => <div key={i} className="shimmer sk-line" style={{ width: `${80 - i * 8}%` }} />)}
           </div>
-        ) : (
-          <>
-            <div className="row between" style={{ marginBottom: 10 }}>
-              <div className="row" style={{ gap: 10 }}>
-                <Avatar name={order.customer_name} url={data?.customer_avatar_url} size="md" />
-                <div style={{ minWidth: 0 }}>
-                  <div style={{ fontWeight: 700 }}>{order.customer_name}</div>
-                  <div className="dim" style={{ fontSize: 12 }}>{order.order_id}</div>
-                </div>
-              </div>
-              <button className="btn ghost sm" onClick={onClose}>✕</button>
-            </div>
+          <button className="btn ghost sm" onClick={onClose}>✕</button>
+        </div>
 
-            <div style={{ marginBottom: 12 }}><StatusPill status={order.status} /></div>
-            <OrderTimeline status={order.status} size="mini" />
+        <div style={{ marginBottom: 12 }}>{status && <StatusPill status={status} />}</div>
+        {status && <OrderTimeline status={status} size="mini" />}
 
-            <div className="card" style={{ padding: 12, marginTop: 14 }}>
-              <div className="label" style={{ marginBottom: 8 }}>Chuyển trạng thái</div>
-              <OrderActions
-                orderId={order.order_id}
-                version={order.version}
-                allowedTransitions={data.allowed_transitions}
-                canFinancial={canFinancial}
-                remaining={order.remaining_amount ?? 0}
-                rawLinkMissing={!order.raw_link}
-                onUpdated={merge}
-                onReload={() => orderId && load(orderId)}
-                layout="stack"
-              />
-            </div>
+        <div className="card" style={{ padding: 12, marginTop: 14 }}>
+          <div className="label" style={{ marginBottom: 8 }}>Chuyển trạng thái</div>
+          {data ? (
+            <OrderActions
+              orderId={data.order.order_id}
+              version={data.order.version}
+              allowedTransitions={data.allowed_transitions}
+              canFinancial={canFinancial}
+              remaining={data.order.remaining_amount ?? 0}
+              rawLinkMissing={!data.order.raw_link}
+              onUpdated={merge}
+              onReload={() => orderId && load(orderId)}
+              layout="stack"
+            />
+          ) : (
+            <div className="dim" style={{ fontSize: 13 }}>Đang tải thao tác…</div>
+          )}
+        </div>
 
-            <div style={{ marginTop: 14, fontSize: 13 }}>
-              <PanelRow label="Ngày chụp" value={fmtDay(order.shoot_date) + (order.arrival_time ? ' · ' + order.arrival_time : '')} />
-              <PanelRow label="Cơ sở" value={dash(order.location_name)} />
-              {c0 && <PanelRow label="Photographer" value={dash(c0.photographer_name)} />}
-              {c0 && <PanelRow label="MUA" value={dash(c0.mua_name)} />}
-              {c0 && <PanelRow label="Hậu kỳ" value={dash(c0.hau_ky_name)} />}
-              {canFinancial && <PanelRow label="Tổng" value={money(order.total_price)} />}
-              {canFinancial && <PanelRow label="Còn lại" value={money(order.remaining_amount)} red={(order.remaining_amount ?? 0) > 0} />}
-            </div>
+        <div style={{ marginTop: 14, fontSize: 13 }}>
+          <PanelRow label="Ngày chụp" value={fmtDay(shootDate) + (arrival ? ' · ' + arrival : '')} />
+          <PanelRow label="Cơ sở" value={dash(locName)} />
+          {/* ekip chỉ có sau khi orders.get về */}
+          {c0 ? (
+            <>
+              <PanelRow label="Photographer" value={dash(c0.photographer_name)} />
+              <PanelRow label="MUA" value={dash(c0.mua_name)} />
+              <PanelRow label="Hậu kỳ" value={dash(c0.hau_ky_name)} />
+            </>
+          ) : (
+            <PanelRow label="Ekip" value="Đang tải…" dim />
+          )}
+          {canFinancial && <PanelRow label="Tổng" value={money(total)} />}
+          {canFinancial && <PanelRow label="Còn lại" value={money(remaining)} red={(remaining ?? 0) > 0} />}
+        </div>
 
-            <div style={{ marginTop: 16 }}>
-              <Link href={'/orders/' + order.order_id} className="btn ghost" style={{ width: '100%' }}>Xem đầy đủ chi tiết →</Link>
-            </div>
-          </>
-        )}
+        <div style={{ marginTop: 16 }}>
+          <Link href={'/orders/' + oid} className="btn ghost" style={{ width: '100%' }}>Xem đầy đủ chi tiết →</Link>
+        </div>
       </aside>
     </>
   )
 }
 
-function PanelRow({ label, value, red }: { label: string; value: string; red?: boolean }) {
+function PanelRow({ label, value, red, dim }: { label: string; value: string; red?: boolean; dim?: boolean }) {
   return (
     <div className="finance-row" style={{ borderTop: 'none', padding: '5px 0' }}>
       <span className="lbl">{label}</span>
-      <span className="val" style={{ fontWeight: 500, color: red ? 'var(--red)' : undefined }}>{value}</span>
+      <span className="val" style={{ fontWeight: 500, color: red ? 'var(--red)' : dim ? 'var(--muted-2)' : undefined }}>{value}</span>
     </div>
   )
 }
